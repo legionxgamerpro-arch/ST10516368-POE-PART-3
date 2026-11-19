@@ -6,6 +6,7 @@ import java.io.PrintStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.util.Scanner;
+import java.util.ArrayList;
 
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
@@ -42,6 +43,9 @@ public class MainTest {
         Main.registeredCellPhone = null;
         Main.totalMessagesToEnter = 1;
         Main.messagesCreated = 0;
+
+        //Part 3 parallel arrays start empty for every test
+        MessageReports.clearArrays();
     }
 
     //Runs after every test: puts everything back and removes the JSON file
@@ -756,21 +760,21 @@ public class MainTest {
 
         Main.runQuickChat();
 
-        assertTrue(output().contains("Invalid option, please enter 1, 2 or 3."));
+        assertTrue(output().contains("Invalid option, please enter 1, 2, 3 or 4."));
         assertTrue(output().contains("Goodbye!"));
     }
-
+    
     @Test
-    public void testRunQuickChat_showMessagesOption_ComingSoon() {
-        //Part 2 requirement: option 2 must display "Coming Soon."
-        giveInput("1", "2", "3"); //quota, Coming Soon option, then Quit
+    public void testRunQuickChat_showMessagesOption() {
+        // Option 2 now shows the recently sent messages (final version)
+        giveInput("1", "2", "3"); // quota, show messages, then Quit
 
         Main.runQuickChat();
 
-        assertTrue(output().contains("Coming Soon."));
-        //The old "No messages..." text must NOT appear for menu option 2
-        assertFalse(output().contains("No messages have been sent yet."));
-    }
+        // With no messages sent yet, the real showMessages() output is expected
+        assertTrue(output().contains("No messages have been sent yet."));
+        assertFalse(output().contains("Coming Soon."));
+}
 
     @Test
     public void testRunQuickChat_reasksForInvalidMessageCount() {
@@ -806,7 +810,8 @@ public class MainTest {
         giveInput("John", "Smith", "jo_h", "Passw0rd!", "+27838968976", //registration
                 "jo_h", "WrongPass1!",                                   //failed login
                 "jo_h", "Passw0rd!",                                     //successful login
-                "1", "3");                                               //quota, then quit QuickChat
+                "1", "3",                                                //quota, then quit QuickChat
+                "6");                                                    //exit Part 3 Message Reports menu
 
         Main.main(new String[0]);
 
@@ -856,5 +861,133 @@ public class MainTest {
         //from Test Case 1 style (first two of ID, message number, first+last word)
         assertEquals("00:0:HITONIGHT",
                 Main.createMessageHash("0012345678", 0, "Hi tonight"));
+    }
+
+    // ------------------------------------------------------------------
+    // Part 3 unit tests required by the brief (assertEquals)
+    // ------------------------------------------------------------------
+
+    @Test
+    public void testSentMessagesArrayCorrectlyPopulated() {
+        //Sent Messages array correctly populated with Test Data messages 1 and 4
+        MessageReports.populateArrays();
+
+        ArrayList<String> sent = MessageReports.getSentMessageTexts();
+        assertTrue(sent.contains("Did you get the cake?"));
+        assertTrue(sent.contains("It is dinner time !"));
+        //The two expected sent messages from the developer entry test data
+        assertEquals(2, sent.size());
+    }
+
+    @Test
+    public void testDisplayTheLongestMessage() {
+        //Option 1 is "Display the longest SENT message"
+        //Among the two sent test-data messages the longer one is "Did you get the cake?"
+        MessageReports.populateArrays();
+
+        String result = MessageReports.findLongestMessage();
+        assertTrue(result.contains("Did you get the cake?"));
+        //Must NOT return a stored message
+        assertFalse(result.contains("Where are you? You are late! I have asked you to be on time."));
+    }
+
+    @Test
+    public void testSearchForMessageID() {
+        //Test Data Message 4 – the brief supplies the recipient value as the ID
+        MessageReports.populateArrays();
+
+        String result = MessageReports.searchByMessageID("0838884567");
+        assertTrue(result.contains("It is dinner time !"));
+    }
+
+    @Test
+    public void testSearchAllMessagesForParticularRecipient() {
+        //Test Data: +27838884567 → the two stored messages for that recipient
+        MessageReports.populateArrays();
+
+        ArrayList<String> found = MessageReports.searchByRecipient("+27838884567");
+        assertEquals(2, found.size());
+        assertTrue(found.contains("Where are you? You are late! I have asked you to be on time."));
+        assertTrue(found.contains("Ok, I am leaving without you."));
+    }
+
+    @Test
+    public void testDeleteMessageUsingMessageHash() {
+        //Test Data: Test Message 2 (the first stored message)
+        MessageReports.populateArrays();
+
+        //Obtain the hash that was generated for message 2
+        String hashOfMessage2 = MessageReports.storedHashes.get(0);
+        String result = MessageReports.deleteByHash(hashOfMessage2);
+
+        assertTrue(result.contains("Where are you? You are late! I have asked you to be on time."));
+        assertTrue(result.contains("successfully deleted"));
+        //Confirm it was removed from the stored arrays
+        assertEquals(1, MessageReports.storedMessages.size());
+    }
+
+    @Test
+    public void testDisplayReport() {
+        //The report must show all sent messages including Message Hash, Recipient and Message
+        MessageReports.populateArrays();
+
+        String report = MessageReports.createReport();
+        assertTrue(report.contains("SENT MESSAGES REPORT"));
+        assertTrue(report.contains("Message Hash:"));
+        assertTrue(report.contains("Recipient:"));
+        assertTrue(report.contains("Message:"));
+        assertTrue(report.contains("Did you get the cake?"));
+        assertTrue(report.contains("It is dinner time !"));
+        assertTrue(report.contains("Total sent messages: 2"));
+    }
+
+    // ------------------------------------------------------------------
+    // Additional Part 3 tests for the Stored Messages menu features
+    // ------------------------------------------------------------------
+
+    @Test
+    public void testDisplayStoredSenderAndRecipient() {
+        Main.firstName = "John";
+        Main.lastName = "Smith";
+        MessageReports.populateArrays();
+
+        String result = MessageReports.displayStoredSenderAndRecipient();
+        assertTrue(result.contains("Sender: John Smith"));
+        assertTrue(result.contains("Recipient: +27838884567"));
+    }
+
+    @Test
+    public void testFindLongestStoredMessage() {
+        MessageReports.populateArrays();
+
+        String result = MessageReports.findLongestStoredMessage();
+        assertTrue(result.contains("Where are you? You are late! I have asked you to be on time."));
+    }
+
+    @Test
+    public void testSearchStoredByRecipient() {
+        MessageReports.populateArrays();
+
+        ArrayList<String> found = MessageReports.searchStoredByRecipient("+27838884567");
+        assertEquals(2, found.size());
+        assertTrue(found.contains("Ok, I am leaving without you."));
+    }
+
+    @Test
+    public void testCreateStoredReport() {
+        MessageReports.populateArrays();
+
+        String report = MessageReports.createStoredReport();
+        assertTrue(report.contains("STORED MESSAGES REPORT"));
+        assertTrue(report.contains("Message Hash:"));
+        assertTrue(report.contains("Recipient: +27838884567"));
+        assertTrue(report.contains("Ok, I am leaving without you."));
+        assertTrue(report.contains("Total stored messages: 2"));
+    }
+
+    @Test
+    public void testDisregardedMessagesPopulatedFromTestData() {
+        MessageReports.populateArrays();
+        assertTrue(MessageReports.disregardedMessages.contains("Yohoooo, I am at your gate."));
     }
 }
