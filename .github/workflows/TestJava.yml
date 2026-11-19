@@ -23,6 +23,6 @@ jobs:
       - name: Build
         run: mvn --batch-mode -DskipTests package
 
-      # Part 2: runs the MainTest class (all 55 unit tests)
+      # Part 3: runs all unit tests in the project (MainTest and any new test classes)
       - name: Test
-        run: mvn --batch-mode -Dmaven.test.failure.ignore=true -Dtest=MainTest test
+        run: mvn --batch-mode -Dmaven.test.failure.ignore=true test
